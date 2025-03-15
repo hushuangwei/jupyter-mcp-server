@@ -4,6 +4,8 @@
   ~ BSD 3-Clause License
 -->
 
+**This folk is to refactor the original implementation to get rid of docker dependency.**
+
 [![Datalayer](https://assets.datalayer.tech/datalayer-25.svg)](https://datalayer.io)
 
 [![Become a Sponsor](https://img.shields.io/static/v1?label=Become%20a%20Sponsor&message=%E2%9D%A4&logo=GitHub&style=flat&color=1ABC9C)](https://github.com/sponsors/datalayer)
@@ -29,78 +31,45 @@ pip install jupyterlab jupyter-collaboration ipykernel
 Then, start JupyterLab with the following command:
 
 ```bash
-jupyter lab --port 8888 --IdentityProvider.token MY_TOKEN --ip 0.0.0.0
+jupyter lab --port 8888 --IdentityProvider.token MY_TOKEN
 ```
 
-> [!NOTE]
-> The `--ip` is set to `0.0.0.0` to allow the MCP server running in a Docker container to access your local JupyterLab.
+## Install the server
+
+```bash
+# in case of debugging
+pip uninstall jupyter-mcp-server jupyter_mcp_server
+pip install -e .
+```
 
 ## Usage with Claude Desktop
 
-To use this with Claude Desktop, add the following to your claude_desktop_config.json:
+To use this with Claude Desktop, firstly modify `run_jupyter_mcp.sh` as you may require. 
+Then make it executable
+
+```bash
+chmod +x run_jupyter_mcp.sh
+```
 
 > [!IMPORTANT]
 > Ensure the port of the `SERVER_URL`and `TOKEN` match those used in the `jupyter lab` command.
 > The `NOTEBOOK_PATH` should be relative to the directory where JupyterLab was started.
 
-### MacOS and Windows
+Then configure your claude_desktop_config.json to use it:
+
+
+### MacOS
 
 ```json
 {
   "mcpServers": {
     "jupyter": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "SERVER_URL",
-        "-e",
-        "TOKEN",
-        "-e",
-        "NOTEBOOK_PATH",
-        "datalayer/jupyter-mcp-server:latest"
-      ],
-      "env": {
-        "SERVER_URL": "http://host.docker.internal:8888",
-        "TOKEN": "MY_TOKEN",
-        "NOTEBOOK_PATH": "notebook.ipynb"
-      }
+      "command": "/full/path/to/run_jupyter_mcp.sh"
     }
   }
 }
 ```
 
-### Linux
-
-```json
-{
-  "mcpServers": {
-    "jupyter": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "SERVER_URL",
-        "-e",
-        "TOKEN",
-        "-e",
-        "NOTEBOOK_PATH",
-        "--network=host",
-        "datalayer/jupyter-mcp-server:latest"
-      ],
-      "env": {
-        "SERVER_URL": "http://localhost:8888",
-        "TOKEN": "MY_TOKEN",
-        "NOTEBOOK_PATH": "notebook.ipynb"
-      }
-    }
-  }
-}
-```
 
 ## Components
 
@@ -134,17 +103,3 @@ The server currently offers 3 tools:
   - `temporal` (tuple): (Optional) Temporal range in the format (date_from, date_to).
   - `bounding_box` (tuple): (Optional) Bounding box in the format (lower_left_lon, lower_left_lat, upper_right_lon, upper_right_lat).
 - Returns: Cell output.
-
-## Building
-
-```bash
-docker build -t datalayer/jupyter-mcp-server .
-```
-
-## Installing via Smithery
-
-To install Jupyter MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@datalayer/jupyter-mcp-server):
-
-```bash
-npx -y @smithery/cli install @datalayer/jupyter-mcp-server --client claude
-```

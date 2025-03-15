@@ -4,6 +4,7 @@
 
 import logging
 import os
+import argparse
 
 from jupyter_kernel_client import KernelClient
 from jupyter_nbmodel_client import NbModelClient, get_jupyter_notebook_websocket_url
@@ -14,12 +15,7 @@ from rich.logging import RichHandler
 # Initialize FastMCP server
 mcp = FastMCP("notebook")
 
-
-# Constants
-NOTEBOOK_PATH = os.getenv("NOTEBOOK_PATH", "notebook.ipynb")
-SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8888")
-TOKEN = os.getenv("TOKEN", "MY_TOKEN")
-
+# Setup logging
 handlers = []
 handlers.append(RichHandler(console=Console(stderr=True), rich_tracebacks=True))
 logging.basicConfig(
@@ -29,10 +25,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-
-kernel = KernelClient(server_url=SERVER_URL, token=TOKEN)
-kernel.start()
 
 
 def extract_output(output: dict) -> str:
@@ -66,10 +58,16 @@ def add_execute_code_cell(cell_content: str) -> str:
     Returns:
         str: Cell output
     """
-    logger.info("Adding and executing code cell")
+    # Get settings from environment or globals
+    server_url = globals().get("SERVER_URL", os.getenv("SERVER_URL", "http://localhost:8888"))
+    token = globals().get("TOKEN", os.getenv("TOKEN", ""))
+    notebook_path = globals().get("NOTEBOOK_PATH", os.getenv("NOTEBOOK_PATH", "notebook.ipynb"))
+    kernel = globals().get("kernel")
+
+    logger.info(f"Adding and executing code cell in {notebook_path}")
 
     notebook = NbModelClient(
-        get_jupyter_notebook_websocket_url(server_url=SERVER_URL, token=TOKEN, path=NOTEBOOK_PATH)
+        get_jupyter_notebook_websocket_url(server_url=server_url, token=token, path=notebook_path)
     )
     notebook.start()
 
@@ -98,10 +96,15 @@ def add_markdown_cell(cell_content: str) -> str:
     Returns:
         str: Success message
     """
-    logger.info("Adding markdown cell")
+    # Get settings from environment or globals
+    server_url = globals().get("SERVER_URL", os.getenv("SERVER_URL", "http://localhost:8888"))
+    token = globals().get("TOKEN", os.getenv("TOKEN", ""))
+    notebook_path = globals().get("NOTEBOOK_PATH", os.getenv("NOTEBOOK_PATH", "notebook.ipynb"))
+
+    logger.info(f"Adding markdown cell to {notebook_path}")
 
     notebook = NbModelClient(
-        get_jupyter_notebook_websocket_url(server_url=SERVER_URL, token=TOKEN, path=NOTEBOOK_PATH)
+        get_jupyter_notebook_websocket_url(server_url=server_url, token=token, path=notebook_path)
     )
     notebook.start()
     notebook.add_markdown_cell(cell_content)
@@ -112,7 +115,7 @@ def add_markdown_cell(cell_content: str) -> str:
 
 @mcp.tool()
 def download_earth_data_granules(
-    folder_name: str, short_name: str, count: int, temporal: tuple, bounding_box: tuple
+        folder_name: str, short_name: str, count: int, temporal: tuple = None, bounding_box: tuple = None
 ) -> str:
     """Add a code cell in a Jupyter notebook to download Earth data granules from NASA Earth Data.
 
@@ -127,7 +130,13 @@ def download_earth_data_granules(
     Returns:
         str: Cell output
     """
-    logger.info("Downloading Earth data granules")
+    # Get settings from environment or globals
+    server_url = globals().get("SERVER_URL", os.getenv("SERVER_URL", "http://localhost:8888"))
+    token = globals().get("TOKEN", os.getenv("TOKEN", ""))
+    notebook_path = globals().get("NOTEBOOK_PATH", os.getenv("NOTEBOOK_PATH", "notebook.ipynb"))
+    kernel = globals().get("kernel")
+
+    logger.info(f"Downloading Earth data granules to {folder_name}")
 
     search_params = {"short_name": short_name, "count": count, "cloud_hosted": True}
 
@@ -144,7 +153,7 @@ results = earthaccess.search_data(**search_params)
 files = earthaccess.download(results, "./{folder_name}")"""
 
     notebook = NbModelClient(
-        get_jupyter_notebook_websocket_url(server_url=SERVER_URL, token=TOKEN, path=NOTEBOOK_PATH)
+        get_jupyter_notebook_websocket_url(server_url=server_url, token=token, path=notebook_path)
     )
     notebook.start()
 
@@ -156,6 +165,42 @@ files = earthaccess.download(results, "./{folder_name}")"""
     return f"Data downloaded in folder {folder_name}"
 
 
-if __name__ == "__main__":
-    # Initialize and run the server
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description="Jupyter MCP Server")
+    parser.add_argument("--server-url", dest="server_url", type=str,
+                        default=os.getenv("SERVER_URL", "http://localhost:8888"),
+                        help="JupyterLab server URL")
+    parser.add_argument("--token", type=str,
+                        default=os.getenv("TOKEN", ""),
+                        help="JupyterLab server token")
+    parser.add_argument("--notebook-path", dest="notebook_path", type=str,
+                        default=os.getenv("NOTEBOOK_PATH", "notebook.ipynb"),
+                        help="Path to the notebook relative to JupyterLab root")
+    return parser.parse_args()
+
+
+def main():
+    """Main entry point."""
+    args = parse_args()
+
+    # Store settings as globals for tools to access
+    global SERVER_URL, TOKEN, NOTEBOOK_PATH, kernel
+    SERVER_URL = args.server_url
+    TOKEN = args.token
+    NOTEBOOK_PATH = args.notebook_path
+
+    logger.info(f"Starting Jupyter MCP Server")
+    logger.info(f"Server URL: {SERVER_URL}")
+    logger.info(f"Notebook path: {NOTEBOOK_PATH}")
+
+    # Initialize kernel client
+    kernel = KernelClient(server_url=SERVER_URL, token=TOKEN)
+    kernel.start()
+
+    # Run the server
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    main()
