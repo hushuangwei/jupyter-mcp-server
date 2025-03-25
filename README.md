@@ -27,6 +27,9 @@ Make sure you have the following installed. The modifications made on the notebo
 ```bash
 pip install jupyterlab jupyter-collaboration ipykernel
 ```
+> For trouble-shooting, use conda install:
+> conda install -c conda-forge jupyterlab
+
 
 Then, start JupyterLab with the following command:
 
