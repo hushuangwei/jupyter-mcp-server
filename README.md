@@ -72,7 +72,7 @@ Then configure your claude_desktop_config.json to use it:
   }
 }
 ```
-
+If not working, you can manually run `run_jupyter_mcp.sh` and the missing packages (like `rich`) may be shown.
 
 ## Components
 
